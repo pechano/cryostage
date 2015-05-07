@@ -2,7 +2,7 @@
 
 double Setpoint, Input, Output;
 
-PID myPID(&Input, &Output, &Setpoint,1,1,1, REVERSE);
+PID myPID(&Input, &Output, &Setpoint,5,1,1, REVERSE);
 
 //Input duty cycle percentage:
 int powerlevel = 0;
@@ -30,7 +30,7 @@ float ratio = 0;
 //for click state
 
 byte state;
-int PWM = 0;
+double PWM = 10;
 int button = 13;
 int ledPin = 10;
 
@@ -60,6 +60,7 @@ int interval = 500;
 int intervalSerial = 5000;
 Bounce bouncer = Bounce( button, 5 );
 
+double TC = thermocouple.readCelsius();
 
 void setup(){;
   pinMode(IRL540,OUTPUT);
@@ -69,7 +70,7 @@ void setup(){;
   Serial.println("Test");
   
   //Init PID control
-  Input = thermocouple.readCelsius();
+  Input = 10;
   Setpoint = 2;
   //Turn on PID
   myPID.SetMode(AUTOMATIC);
@@ -84,9 +85,10 @@ lcd.clear();
 
 void loop(){;
 
-//PID Control
-
-  Input = thermocouple.readCelsius();
+  //PID Control
+delay(100);
+  TC = thermocouple.readCelsius();
+  Input = TC;
   myPID.Compute();
   analogWrite(IRL540,Output);
   
@@ -123,18 +125,20 @@ currentTimeSerial = millis();
 
 if ( currentTime - previousTime > interval ) {
   
+
+  
 //Cursor is set for first line
       
       
       lcd.setCursor(0,0);
       lcd.print("TC:");
       lcd.setCursor(3,0);
-      lcd.print(thermocouple.readCelsius());
-      lcd.setCursor(8,0);
+      lcd.print(TC);
+    /*  lcd.setCursor(8,0);
       lcd.print("TR:");
       lcd.setCursor(11,0);
       lcd.print(T);
-      
+    */  
 
        
        lcd.setCursor(0,1);
