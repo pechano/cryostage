@@ -18,11 +18,17 @@
   int button = 13;
   int ledPin = 10;
   int ledPWM = 0;
-  boolean ledState = LOW;
+  boolean ledState = HIGH;
 
-//Define 16x2 LCD
-  #include <LiquidCrystal.h>
-    LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
+//Define 16x2 Grove RGB LCD v2.0
+#include <Wire.h>
+#include "rgb_lcd.h"
+
+rgb_lcd lcd;
+
+const int colorR = 255;
+const int colorG = 0;
+const int colorB = 0;
 
 //Define Adafruit MAX31855 Thermocouple Breakout
   #include "Adafruit_MAX31855.h"
@@ -83,12 +89,13 @@ void setup(){;
 
   //Init PID control
     Input = TC;
-    Setpoint = 2;
+    Setpoint = 10;
   //Turn on PID
     myPID.SetMode(AUTOMATIC);
   
-  //Start the LCD, sey hello and clear
+  //Start the LCD, say hello and clear
     lcd.begin(16, 2);
+    lcd.setRGB(colorR, colorG, colorB);
     lcd.print("Temperature LCD");
     delay(1000);
     lcd.clear();
@@ -105,17 +112,14 @@ void loop()
 {;
 
   //Buttonpin controls ledPin through ledPWM.
-    if ( bouncer.read() == HIGH) 
-    {
-      ledState = !ledState;
+  
+    if ( bouncer.update() ) {
+    if ( bouncer.read() == HIGH) {
+        ledState = !ledState;
       digitalWrite( ledPin, ledState );
     }
-    
-    }
+}
 
-
-  
-analogWrite(IRL540,PWM);
 
   //PID Control with quality control. NaN will be rejected.
     currentTimeTC = millis();
