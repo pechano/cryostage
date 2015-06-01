@@ -2,7 +2,7 @@
 
 
     #include "SPI.h" //SPI Library supplied with the Arduino. A dependency of the Adafruit MAX31855 library.
-    #include "Adafruit_MAX31855.h" //Used for communicating with the MAX31855 chip. https://github.com/adafruit/Adafruit-MAX31855-library
+    #include "MAX31855.h" //Library by Rob Tillaart. Used for communicating with the MAX31855 chip. https://github.com/RobTillaart/Arduino/tree/master/libraries/MAX31855
     #include <PID_v1.h> //The Arduino PID algorithm by Brett Beauregaard, used to control temperature in setpoint mode. https://github.com/br3ttb/Arduino-PID-Library
     #include <math.h> //Math functions used in thermistor calculations.
     #include <Wire.h> //I2C library used for communicating with the LCD.
@@ -34,7 +34,7 @@
 
 
 // Initialize the Thermocouple
-    Adafruit_MAX31855 thermocouple(thermoCLK, thermoCS, thermoDO);
+    MAX31855 tc(thermoCLK, thermoCS, thermoDO);
 
  
 
@@ -68,10 +68,10 @@
     int colorB = 0;
 
 //Initiate the variables that will be used for storing temperature readouts. oldTC is the latest numeric readout, should the thermocouple return NaN.
-    double TC = thermocouple.readCelsius();
+    float TC = tc.getTemperature();
 
 //Supply temperature readout with an arbitrary initial reading to avoid NaN errors
-    double oldTC = 10.0;
+    float oldTC = 10.0;
 
 //Variable used to store incoming serial data. The stored value can be used as setpoint for the PID control
     float incoming = 10.0;
@@ -98,7 +98,8 @@ void setup(){
 
     //Start the setup by getting a real thermocouple reading. There is one fallback reading, but a NaN will at that point set TC=oldTC.
         if  (isnan(TC)) {
-            TC = thermocouple.readCelsius();
+            tc.read();
+            TC = tc.getTemperature();
             if (isnan(TC)) {
                 TC = oldTC;
             }
@@ -162,9 +163,11 @@ void loop(){
 
         currentTimeTC = millis();
         if  (currentTimeTC - previousTimeTC > intervalTC) {
-            TC = thermocouple.readCelsius();
+            tc.read();
+            TC = tc.getTemperature();
             if  (isnan(TC)) {
-                TC = thermocouple.readCelsius();
+                tc.read();
+                TC = tc.getTemperature();
                 if (isnan(TC)) {
                     TC = oldTC;
                 }
