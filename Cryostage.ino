@@ -28,9 +28,9 @@
     int topButton = 10;
     
 //Initiate pins used for status LED and microscope light    
-    int freezeLED =11;
+    int freezeLED =13;
     int PIDLED = 12;
-    int microscopeLED = 13;
+    int microscopeLED = 11;
 
 
 // Initialize the Thermocouple
@@ -48,7 +48,7 @@
 //Define constants and variables for temperature calculation, following Steinhart-Hart.
     float T0 = 298.15;
     float B = 3950;//B-value from the datasheet of the 100k NTC.
-    float R0 = 101050;//Measured on 100k resistor with multimeter.
+    float R0 = 75400;//Measured on 100k resistor with multimeter.
     float Ti = 0;
     float T = 0;
     float R = 0;
@@ -56,7 +56,7 @@
 //Variables needed for voltage divider at the 100k NTC on A2.
     int signal;
     float vout;
-    float vin = 4.97;//Measured between 5v and GND on the Arduino, using a multimeter.
+    float vin = 3.30;//Measured between 5v and GND on the Arduino, using a multimeter.
 
 //Initiate the tempstate variable which decides the mode of action for temperature control. The initial value "0" corresponds to load (PWM=0).    
     int tempstate = 0;
@@ -77,7 +77,7 @@
     float incoming = 10.0;
 
 //Voltage divider input on analog pin 2. 
-    int potSignal;
+    float potSignal;
 
 //Define variables used in timekeeping.
     unsigned long previousTimeLCD = 0;
@@ -96,6 +96,8 @@
 
 void setup(){
 
+  
+  analogReference(EXTERNAL);
     //Start the setup by getting a real thermocouple reading. There is one fallback reading, but a NaN will at that point set TC=oldTC.
         if  (isnan(TC)) {
             tc.read();
@@ -152,7 +154,7 @@ void loop(){
         signal = analogRead(A0);
         vout = signal;
         vout = (vout/1023)*vin;
-        R = R0*(vin/vout)-R0;
+        R = (R0*vout)/(vin-vout);
    
         Ti = (1/T0)+(1/B)*log(R/R0);
         T = 1/Ti; 
@@ -224,14 +226,15 @@ void loop(){
             break;
 
             case 1://Tempsate is at the PID position, meaning the PID algorithm will run and lights will be turned on
+                Setpoint = incoming;
                 digitalWrite(PIDLED,HIGH);
                 digitalWrite(freezeLED,LOW);
-                digitalWrite(microscopeLED,HIGH);
+                analogWrite(microscopeLED,30);
                 colorR=255-int(Output);colorG=0;colorB=int(Output);//LCD backlight is set according to cooling power. 255=blue, 0=red.
                 lcd.setRGB(colorR, colorG, colorB);
             
                 //PID Control with quality control, using the TC value from the beginning of the loop.
-                    Input = TC;
+                    Input = T;
                     myPID.Compute();
                     analogWrite(IRL540,Output);
             break;
@@ -250,13 +253,18 @@ void loop(){
 
             case 3://Tempstate 3 is the same as load, but with the microscope LED also turned on. The LCD backlight is also set to full white, so this loading mode provides some work light.
                 potSignal = analogRead(A2);
-                potSignal = map(potSignal,0,925,0,255);//925 was chosed instead of the usual 1023 because the voltage on the 5v rail was 4.5v in this particular case.
-                potSignal = constrain(potSignal,0,255);        
-                Output = potSignal;
+               // potSignal = map(potSignal,0,1023,-20,10);//925 was chosen instead of the usual 1023 because the voltage on the 5v rail was 4.5v in this particular case.
+              // potSignal = constrain(potSignal,0,255);   
+               potSignal = potSignal - 511;
+                potSignal = potSignal/50;
+               Setpoint = potSignal;
+               Input = T;
+               myPID.Compute();
+                
                 analogWrite(IRL540,Output);
                 digitalWrite(PIDLED,LOW);
                 digitalWrite(freezeLED, LOW);
-                digitalWrite(microscopeLED,HIGH);
+                analogWrite(microscopeLED,30);
 
                 colorR = 255;colorG=255;colorB=255;
                 lcd.setRGB(colorR, colorG, colorB);
@@ -269,7 +277,8 @@ void loop(){
     //Receive setpoint from serial, if available
 
         if  (Serial.available() > 0 ){
-	        incoming = Serial.parseInt();
+	        incoming = Serial.parseFloat();
+                Setpoint = incoming;
         }
 
 
@@ -283,9 +292,9 @@ void loop(){
     
             //Cursor is set for first line and TC temperature is printed
                 lcd.setCursor(0,0);
-                lcd.print("TC:");
+                lcd.print("TR:");
                 lcd.setCursor(3,0);
-                lcd.print(TC);
+                lcd.print(T);
                 lcd.setCursor(8,0);
                 lcd.print("State: ");
                 lcd.setCursor(15,0);
@@ -297,8 +306,8 @@ void loop(){
                 lcd.print("SP:");
                 lcd.setCursor(3,1);
                 lcd.print(Setpoint);
-                lcd.setCursor(6,1);
-                lcd.print("C");
+             //   lcd.setCursor(6,1);
+              //  lcd.print("C");
                 lcd.setCursor(8, 1);
                 lcd.print("PWM:");
                 lcd.setCursor(12,1);
@@ -319,13 +328,14 @@ void loop(){
     	   	    Serial.println(" C");
     
             //Print temperature and duty cycle
-                Serial.print("Duty cycle: ");
-       	        Serial.println(Output);
-      	 	    Serial.println(" C");   
-                Serial.println(TC);
+
                 Serial.print("100kNTC : ");
                 Serial.println(T);
                 
+                Serial.print("resistance : ");
+                Serial.println(R);
+                Serial.print("potentiometer ");
+                Serial.println(potSignal);
             //Reset the Serial timer for next cycle
                 previousTimeSerial = currentTimeSerial;  
         }
