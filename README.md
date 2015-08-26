@@ -1,6 +1,7 @@
 # cryostage
 
-Contained within the /cryostage repository is all the resources needed to use the Arduino powered cyostage by Johannes Lørup Buch.
+Contained within the /Cryostage repository is all the resources needed to use the Arduino controlled cryostage by Johannes Lørup Buch.
+
 This includes:
 	The Arduino sketch
 	EAGLE files for schematic and PCB (ressources)
