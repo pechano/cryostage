@@ -2,7 +2,6 @@
 
 
     #include "SPI.h" //SPI Library supplied with the Arduino. A dependency of the Adafruit MAX31855 library.
-    #include "MAX31855.h" //Library by Rob Tillaart. Used for communicating with the MAX31855 chip. https://github.com/RobTillaart/Arduino/tree/master/libraries/MAX31855
     #include <PID_v1.h> //The Arduino PID algorithm by Brett Beauregaard, used to control temperature in setpoint mode. https://github.com/br3ttb/Arduino-PID-Library
     #include <math.h> //Math functions used in thermistor calculations.
     #include <Wire.h> //I2C library used for communicating with the LCD.
@@ -10,12 +9,6 @@
 
 
 //****************************PINS*********************************
-
-
-//Initiate Adafruit MAX31855 Thermocouple Breakout pins. SPI Device.
-    int thermoCLK = 5;
-    int thermoCS = 4;
-    int thermoDO = 3;
 
 //Define MOSFET pin. PWM output from the PID control will go through this pin
     int IRL540 = 6;
@@ -31,11 +24,7 @@
     int freezeLED =13;
     int PIDLED = 12;
     int microscopeLED = 11;
-
-
-// Initialize the Thermocouple
-    MAX31855 tc(thermoCLK, thermoCS, thermoDO);
-
+   
  
 
 //************************VARIABLES******************************
@@ -56,7 +45,7 @@
 //Variables needed for voltage divider at the 100k NTC on A2.
     int signal;
     float vout;
-    float vin = 3.30;//Measured between 5v and GND on the Arduino, using a multimeter.
+    float vin = 3.30;//Measured between 3.3v(aref) and GND on the Arduino, using a multimeter.
 
 //Initiate the tempstate variable which decides the mode of action for temperature control. The initial value "0" corresponds to load (PWM=0).    
     int tempstate = 0;
@@ -67,17 +56,12 @@
     int colorG = 0;
     int colorB = 0;
 
-//Initiate the variables that will be used for storing temperature readouts. oldTC is the latest numeric readout, should the thermocouple return NaN.
-    float TC = tc.getTemperature();
-
-//Supply temperature readout with an arbitrary initial reading to avoid NaN errors
-    float oldTC = 10.0;
-
 //Variable used to store incoming serial data. The stored value can be used as setpoint for the PID control
-    float incoming = 10.0;
+    float incoming = 2;
 
 //Voltage divider input on analog pin 2. 
     float potSignal;
+    int light;
 
 //Define variables used in timekeeping.
     unsigned long previousTimeLCD = 0;
@@ -87,26 +71,13 @@
     unsigned long previousTimeSerial = 0;
     unsigned long currentTimeSerial = 0;
     int intervalSerial = 1000;
-  
-    unsigned long previousTimeTC = 0;
-    unsigned long currentTimeTC = 0;
-    int intervalTC = 300;
 
 //**************************SETUP SETUP SETUP SETUP SETUP****************************
 
 void setup(){
 
-  
-  analogReference(EXTERNAL);
-    //Start the setup by getting a real thermocouple reading. There is one fallback reading, but a NaN will at that point set TC=oldTC.
-        if  (isnan(TC)) {
-            tc.read();
-            TC = tc.getTemperature();
-            if (isnan(TC)) {
-                TC = oldTC;
-            }
-                        
-        }
+    //3.3V (AREF) is used in place of the 5V rail to reduce noise in thermistor readings
+        analogReference(EXTERNAL);
 
     //Define pinmodes for MOSFET, button and optional LED pin
         pinMode(boardButton,INPUT);
@@ -122,8 +93,8 @@ void setup(){
         pinMode(IRL540,OUTPUT);
 
     //Init PID control
-        Input = TC;
-        Setpoint = 10;
+        Input = T;
+        Setpoint = 2;
 
     //Turn on PID
         myPID.SetMode(AUTOMATIC);
@@ -141,7 +112,7 @@ void setup(){
         lcd.print("Temperature LCD");
         delay(1000);
         lcd.clear();
-};
+}
 
 /*
 **************************LEWP LEWP LEWP LEWP LEWP LEWP****************************
@@ -160,27 +131,8 @@ void loop(){
         T = 1/Ti; 
         T = T - 273.15;
         
-      
-    //If intervalTC time has passed, a readout will be stored in the TC variable. NaN will result in an extra reading before finally using oldTC if the problem persists
 
-        currentTimeTC = millis();
-        if  (currentTimeTC - previousTimeTC > intervalTC) {
-            tc.read();
-            TC = tc.getTemperature();
-            if  (isnan(TC)) {
-                tc.read();
-                TC = tc.getTemperature();
-                if (isnan(TC)) {
-                    TC = oldTC;
-                }
-                
-            }
-            oldTC = TC;
-            previousTimeTC = currentTimeTC;
-        }
-
-
-    //BoardButton press sets the temperature state to 3(Load with microscope light)
+    //BoardButton press sets the temperature state to 3(Potentiometer PID with microscope light)
 
         if  (digitalRead(boardButton)==HIGH) {
             tempstate = 3;
@@ -192,10 +144,11 @@ void loop(){
             tempstate = 0; 
         }
 
-    //PidButton press sets the tempstate to 1, which is PID control from setpoint.
+    //PidButton press sets the tempstate to 1, which is PID control from serial setpoint.
 
         if  (digitalRead(PIDButton)==HIGH) {
             tempstate = 1;
+             
         }
 
     //Freezebutton press sets the tempstate to 2, which is deep freeze. PWM is 255
@@ -215,21 +168,22 @@ void loop(){
 
         switch(tempstate){
 
-            case 0://Tempstate is at the load position, no lights and no cooling
-                Output = 0;
+            case 0://Tempstate is at the load position, low lights and low cooling
+                Output = 20;
                 analogWrite(IRL540,Output);
                 digitalWrite(PIDLED, LOW);
                 digitalWrite(freezeLED, LOW);
-                digitalWrite(microscopeLED,LOW);
+                analogWrite(microscopeLED,30);
                 colorR = 0;colorG=255;colorB=0;
                 lcd.setRGB(colorR, colorG, colorB);
             break;
 
-            case 1://Tempsate is at the PID position, meaning the PID algorithm will run and lights will be turned on
+            case 1://Tempstate is at the PID position, meaning the PID algorithm will run and lights will be turned on
                 Setpoint = incoming;
+                light = 255;
                 digitalWrite(PIDLED,HIGH);
                 digitalWrite(freezeLED,LOW);
-                analogWrite(microscopeLED,30);
+                analogWrite(microscopeLED,light);
                 colorR=255-int(Output);colorG=0;colorB=int(Output);//LCD backlight is set according to cooling power. 255=blue, 0=red.
                 lcd.setRGB(colorR, colorG, colorB);
             
@@ -251,20 +205,18 @@ void loop(){
 
             break;
 
-            case 3://Tempstate 3 is the same as load, but with the microscope LED also turned on. The LCD backlight is also set to full white, so this loading mode provides some work light.
-                potSignal = analogRead(A2);
-               // potSignal = map(potSignal,0,1023,-20,10);//925 was chosen instead of the usual 1023 because the voltage on the 5v rail was 4.5v in this particular case.
-              // potSignal = constrain(potSignal,0,255);   
-               potSignal = potSignal - 511;
+            case 3://Tempstate 3 is the same as PID, but setpoint is determined by the potentiometer on A2. The LCD backlight is also set to 30, same as PID mode.
+                potSignal = analogRead(A2);   
+                potSignal = potSignal - 511;
                 potSignal = potSignal/50;
-               Setpoint = potSignal;
-               Input = T;
-               myPID.Compute();
+                Setpoint = potSignal;
+                Input = T;
+                myPID.Compute();
                 
                 analogWrite(IRL540,Output);
                 digitalWrite(PIDLED,LOW);
                 digitalWrite(freezeLED, LOW);
-                analogWrite(microscopeLED,30);
+                digitalWrite(microscopeLED,HIGH);
 
                 colorR = 255;colorG=255;colorB=255;
                 lcd.setRGB(colorR, colorG, colorB);
@@ -274,11 +226,11 @@ void loop(){
     }
 
 
-    //Receive setpoint from serial, if available
+    //Receive setpoint from serial, if available. 
 
         if  (Serial.available() > 0 ){
-	        incoming = Serial.parseFloat();
-                Setpoint = incoming;
+	        incoming = Serial.parseFloat();//The setpoint is stored in the "incoming" variable. It is only used in tempstate=1
+                
         }
 
 
@@ -306,8 +258,6 @@ void loop(){
                 lcd.print("SP:");
                 lcd.setCursor(3,1);
                 lcd.print(Setpoint);
-             //   lcd.setCursor(6,1);
-              //  lcd.print("C");
                 lcd.setCursor(8, 1);
                 lcd.print("PWM:");
                 lcd.setCursor(12,1);
@@ -326,16 +276,13 @@ void loop(){
     	   	    Serial.print("Received setpoint: ");
     	   	    Serial.print(Setpoint);
     	   	    Serial.println(" C");
+                    Serial.println(light);
     
             //Print temperature and duty cycle
 
                 Serial.print("100kNTC : ");
                 Serial.println(T);
                 
-                Serial.print("resistance : ");
-                Serial.println(R);
-                Serial.print("potentiometer ");
-                Serial.println(potSignal);
             //Reset the Serial timer for next cycle
                 previousTimeSerial = currentTimeSerial;  
         }
