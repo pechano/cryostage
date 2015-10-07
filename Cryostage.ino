@@ -1,3 +1,15 @@
+/*
+
+***************************************************************
+* Cryostage control - Version 1.0.0
+* by Johannes Lørup Buch <jloerup@gmail.com>
+*
+* This sketch is licensed under a GPLv3 License and is purely for academic purposes.
+***************************************************************
+
+*/
+
+
 //****************************LIBRARIES****************************
 
 
