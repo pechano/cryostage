@@ -1,0 +1,28 @@
+Put these two code blocks into separate files and rename the file extension .bat
+
+@echo off
+echo video convert xh264
+echo **************************
+echo video codec : libxh264
+echo **************************
+echo.
+set /p output= Output File (No need to specify file type): 
+set /p vbitrate= Output video bitrate (1300k should suffice) : 
+set /p duration= Duration in seconds (33 minutes is 1980) :
+ffmpeg -f dshow -s 768x576 -r 25 -i video="Pinnacle DCxx MJPEG Capture Filter" 
+-b:v %vbitrate% -an -t %duration% "%output%.avi"
+pause
+
+
+@echo off
+echo Convert to MPEG for ImageJ
+echo **************************
+echo video codec : mjpeg
+echo **************************
+echo.
+set /p input= Input File : 
+set /p output= Output File :
+set /p length= Time factor: 
+ffmpeg -i "%input%" -f avi -filter:v "setpts=%length%*PTS" 
+-vcodec mjpeg -b:v 3000k -an "%output%"
+pause
