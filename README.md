@@ -12,6 +12,7 @@ This includes:
 	The scientific poster used to present the project
 
 The project was a part of my PhD thesis and anything contained here has been used purely for academic purposes. 
+The original research article can be found at: http://www.sciencedirect.com/science/article/pii/S0011224016300372
 
 ###########
 Arduino libraries used:
